@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+    <title>MODEL</title>
+
+<body>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.9/build/dat.gui.min.js"></script>
+
+    <script>
+        let renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        let scene = new THREE.Scene();
+        let camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 3, 6);
+
+        let controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = true;
+        controls.enablePan = false;
+
+        // === HDR Environment ===
+        let pmremGen = new THREE.PMREMGenerator(renderer);
+        pmremGen.compileEquirectangularShader();
+        let exrLoader = new THREE.EXRLoader();
+        exrLoader.load('https://nanthakorn04.github.io/envi/the_sky_is_on_fire_2k.exr', function (tex) {
+            let env = pmremGen.fromEquirectangular(tex).texture;
+            scene.environment = env;
+            scene.background = env;
+            tex.dispose();
+            pmremGen.dispose();
+        });
+
+        // === Studio Lights ===
+        let keyLight = new THREE.DirectionalLight(0xfff2e0, 1.5);
+        keyLight.position.set(4, 5, 4);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.radius = 4;
+        scene.add(keyLight);
+
+        let fillLight = new THREE.DirectionalLight(0x99ccff, 0.8);
+        fillLight.position.set(-3, 3, -2);
+        scene.add(fillLight);
+
+        let rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        rimLight.position.set(0, 4, -6);
+        scene.add(rimLight);
+
+        let ambient = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambient);
+
+        // === Load Models ===
+        let gltfLoader = new THREE.GLTFLoader();
+        gltfLoader.load('https://nanthakorn04.github.io/model/spiddarund.glb', function (gltf) {
+            let model = gltf.scene;
+            model.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+            scene.add(model);
+        });
+
+    
+const anotherModelLoader = new THREE.GLTFLoader();
+anotherModelLoader.load('https://nanthakorn04.github.io/model/water_tower.glb', function (gltf) {
+    const newModel = gltf.scene;
+
+    newModel.traverse(function (child) {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
+
+   
+    newModel.position.set(4, 0, 0); 
+    newModel.scale.set(0.02, 0.02, 0.02); 
+
+    scene.add(newModel);
+});
+        // === Floor ===
+        let floorTex = new THREE.TextureLoader().load('https://nanthakorn04.github.io/model/cracked_concrete_diff_2k.jpg');
+        floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+        floorTex.repeat.set(4, 4);
+        let floorMat = new THREE.MeshStandardMaterial({ map: floorTex });
+        let floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // === dat.GUI ===
+        let gui = new dat.GUI({ width: 300 });
+
+        // Key Light Folder
+        let keyFolder = gui.addFolder('Key Light');
+        keyFolder.add(keyLight, 'intensity', 0, 3).step(0.05);
+        keyFolder.add(keyLight.position, 'x', -10, 10).step(0.1);
+        keyFolder.add(keyLight.position, 'y', 0, 10).step(0.1);
+        keyFolder.add(keyLight.position, 'z', -10, 10).step(0.1);
+        let keyColor = { color: keyLight.color.getHex() };
+        keyFolder.addColor(keyColor, 'color').onChange(v => keyLight.color.set(v));
+        keyFolder.open();
+
+        // Fill Light Folder
+        let fillFolder = gui.addFolder('Fill Light');
+        fillFolder.add(fillLight, 'intensity', 0, 3).step(0.05);
+        fillFolder.add(fillLight.position, 'x', -10, 10).step(0.1);
+        fillFolder.add(fillLight.position, 'y', 0, 10).step(0.1);
+        fillFolder.add(fillLight.position, 'z', -10, 10).step(0.1);
+        let fillColor = { color: fillLight.color.getHex() };
+        fillFolder.addColor(fillColor, 'color').onChange(v => fillLight.color.set(v));
+        fillFolder.open();
+
+        // Rim Light Folder
+        let rimFolder = gui.addFolder('Rim Light');
+        rimFolder.add(rimLight, 'intensity', 0, 3).step(0.05);
+        rimFolder.add(rimLight.position, 'x', -10, 10).step(0.1);
+        rimFolder.add(rimLight.position, 'y', 0, 10).step(0.1);
+        rimFolder.add(rimLight.position, 'z', -10, 10).step(0.1);
+        let rimColor = { color: rimLight.color.getHex() };
+        rimFolder.addColor(rimColor, 'color').onChange(v => rimLight.color.set(v));
+        rimFolder.open();
+
+        // === Animate ===
+        function animate() {
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // === Resize ===
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+
+</body>
+
+</html>
